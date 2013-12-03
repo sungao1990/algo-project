@@ -1,4 +1,4 @@
-CXX = g++
+CXX = clang++
 CXXFLAGS = -Wall -O0 -g `pkg-config --cflags gtk+-2.0`
 PROGRAMS = convex-hull-slow
 
