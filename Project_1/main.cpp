@@ -112,7 +112,7 @@ int main ()
 {
 	set<string> characters;
 	map<string, list<string> > books;
-	map<string, list<string>> ch_bo;
+	map<string, list<string> > ch_bo;
 	clock_t start, finish;
 	double duration;
 
