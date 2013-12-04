@@ -5,9 +5,11 @@
 #include <map>
 #include <math.h>
 #include <time.h>
+#include <sys/time.h>
 
-#define POINT_QTY 500
+#define POINT_QTY 20
 #define pi M_PI
+
 
 using namespace std;
 class Point;
@@ -16,6 +18,8 @@ vector<Point> Points;
 map<Point*,Point*> hull_vectors;   //key is the starting point, value is the ending point
 vector<Point*> hull_points;
 bool plot_hull(false);
+
+
 
 double Ang_Norm(double a)
 {
@@ -36,6 +40,9 @@ double Ang_Norm(double a)
 	
 	return a;
 }
+
+
+
 
 class Point
 {
@@ -70,9 +77,46 @@ public:
 };
 
 
-double rand_gen(double range)
+
+
+double rand_gen (double range)
 {
+	static struct timeval t0 = { 0, 0 };
+	if (0 == t0.tv_sec)
+	{
+		gettimeofday (&t0, NULL);
+		srand (t0.tv_usec);
+	}
 	return (double)rand()/(double)RAND_MAX*range;
+}
+
+
+
+double rand_gen (double minval, double maxval)
+{
+  	static struct timeval t0 = { 0, 0 };
+	if (0 == t0.tv_sec)
+	{
+		gettimeofday (&t0, NULL);
+		srand (t0.tv_usec);
+	}
+	
+	if(minval > maxval)
+	{
+		double temp = minval;
+		minval = maxval;
+		maxval = temp;
+	}
+	
+	if(minval == maxval)
+	{
+		return minval;
+	}
+	else
+	{
+		double range = maxval - minval;
+		return (double)rand()/(double)RAND_MAX*range+minval;
+	}
 }
 
 
@@ -81,8 +125,20 @@ double rand_gen(double range)
 
 static void cb_draw()
 {
-	gfx::set_view(-0.5, -0.5, 1.5, 1.5);
-	gfx::set_pen (3.0, 0.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
+	double x_min(Points.begin()->x), x_max(Points.begin()->x), y_min(Points.begin()->y), y_max(Points.begin()->y);
+	
+	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+	{
+		if(x_min > it->x) x_min = it->x;
+		if(x_max < it->x) x_max = it->x;
+		if(y_min > it->y) y_min = it->y;
+		if(y_max < it->y) y_max = it->y;
+	}
+	
+	gfx::set_view(x_min-0.5, y_min-0.5, x_max+0.5, y_max+0.5);
+	
+	
+	gfx::set_pen (10.0, 0.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
 	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		gfx::draw_point(it->x, it->y);
@@ -184,14 +240,16 @@ static void cb_shuffle()
 {
 	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
-		double x = rand_gen(1);
-		double y = rand_gen(1);
-		it->x = x;
-		it->y = y;
+		double Rand_C_r  = rand_gen(rand_gen(5));
+		double Rand_C_th = rand_gen(rand_gen(4*pi));
+		double r = rand_gen(rand_gen(10));
+		double th = rand_gen(rand_gen(4*pi));
+		double xx = Rand_C_r*cos(Rand_C_th) + r*cos(th);
+		double yy = Rand_C_r*sin(Rand_C_th) + r*sin(th);
+		it->x = xx;
+		it->y = yy;
 	}
 }
-
-
 
 
 
@@ -203,17 +261,15 @@ int main()
 	// Generate some random points
 	for (int i=0; i<POINT_QTY; i++)
 	{
-		double x = rand_gen(1);
-		double y = rand_gen(1);
-		Points.push_back(Point(x,y));
+		double Rand_C_r  = rand_gen(rand_gen(5));
+		double Rand_C_th = rand_gen(rand_gen(4*pi));
+		double r = rand_gen(rand_gen(10));
+		double th = rand_gen(rand_gen(4*pi));
+		double xx = Rand_C_r*cos(Rand_C_th) + r*cos(th);
+		double yy = Rand_C_r*sin(Rand_C_th) + r*sin(th);
+		Points.push_back(Point(xx,yy));
 	}
 	
-	// display them
-	//cout << "Points Generated:" << endl;
-	//for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-	//{
-		//cout << "(" << it->x << ", " << it->y << ")" << endl;
-	//}
 	
 		
 	// This just enables (rather verbose) debug messages from the gfx
