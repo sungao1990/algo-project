@@ -1,6 +1,6 @@
 CXX = clang++
 CXXFLAGS = -Wall -O0 -g `pkg-config --cflags gtk+-2.0`
-PROGRAMS = convex-hull-slow
+PROGRAMS = convex-hull
 
 all:
 	for prg in $(PROGRAMS); \
@@ -15,4 +15,4 @@ clean:
 	rm -rf *~ *.o *.dSYM $(PROGRAMS)
 
 gfx.o: gfx.cpp gfx.hpp Makefile
-convex-hull-slow.o: convex-hull-slow.cpp gfx.hpp Makefile
+convex-hull.o: convex-hull.cpp gfx.hpp Makefile
