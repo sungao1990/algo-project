@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "gfx.hpp"
 #include <vector>
+#include <list>
 #include <map>
 #include <math.h>
 #include <time.h>
@@ -17,7 +18,10 @@ class Point;
 vector<Point> Points;
 map<Point*,Point*> hull_vectors;   //key is the starting point, value is the ending point
 vector<Point*> hull_points;
+list<Point*> L_upper;
+list<Point*> L_lower;
 bool plot_hull(false);
+double x_min, x_max, y_min, y_max;
 
 
 
@@ -79,6 +83,31 @@ public:
 
 
 
+
+
+
+
+
+
+bool Right_Turn(Point* P1, Point* P2, Point* P3)
+{
+	double a1,a2,da;
+	a1 = atan2(P2->y-P1->y, P2->x-P1->x);
+	a2 = atan2(P3->y-P2->y, P3->x-P2->x);
+	da = Ang_Norm(a2-a1);
+	if(da > 0)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+
+
+
 double rand_gen (double range)
 {
 	static struct timeval t0 = { 0, 0 };
@@ -121,19 +150,27 @@ double rand_gen (double minval, double maxval)
 
 
 
+void Print_Hull()
+{
+	cout << "Hull length: " << hull_points.size() << endl;
+	for(vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
+	{
+		
+		cout << "(" << (*it)->x << "," << (*it)->y << ")";
+		if(it!=hull_points.end()-1)
+		{
+			cout << "->" << endl;
+		}
+	}
+	cout << endl;
+}
+
+
 
 
 static void cb_draw()
 {
-	double x_min(Points.begin()->x), x_max(Points.begin()->x), y_min(Points.begin()->y), y_max(Points.begin()->y);
 	
-	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-	{
-		if(x_min > it->x) x_min = it->x;
-		if(x_max < it->x) x_max = it->x;
-		if(y_min > it->y) y_min = it->y;
-		if(y_max < it->y) y_max = it->y;
-	}
 	
 	gfx::set_view(x_min-0.5, y_min-0.5, x_max+0.5, y_max+0.5);
 	
@@ -143,15 +180,40 @@ static void cb_draw()
 	{
 		gfx::draw_point(it->x, it->y);
 	}
+	
 	if (plot_hull)
 	{
 		gfx::set_pen (1.0, 1.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
-		for (map<Point*,Point*>::iterator it=hull_vectors.begin(); it!=hull_vectors.end(); it++)
+		
+		for (vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
 		{
-			gfx::draw_line (it->first->x, it->first->y, it->second->x, it->second->y);
+			if(it!=--hull_points.end())
+			{
+				vector<Point*>::iterator next = it + 1;
+				gfx::draw_line((*it)->x, (*it)->y, (*next)->x, (*next)->y);
+			}
+			else
+			{
+				vector<Point*>::iterator next = hull_points.begin();
+				gfx::draw_line((*it)->x, (*it)->y, (*next)->x, (*next)->y);
+			}
 		}
+		
 		plot_hull = false;
 	}
+	
+	/*
+	gfx::set_pen (15.0, 1.0, 0.0, 0.0, 1.0);
+	for(list<Point*>::iterator it=L_upper.begin(); it!=L_upper.end(); it++)
+	{
+		gfx::draw_point((*it)->x, (*it)->y);
+	}
+	
+	gfx::set_pen (15.0, 0.0, 1.0, 0.0, 1.0);
+	for(list<Point*>::iterator it=L_lower.begin(); it!=L_lower.end(); it++)
+	{
+		gfx::draw_point((*it)->x, (*it)->y);
+	}*/
 }
 
 static void cb_mouse (double mx, double my, int flags)
@@ -196,7 +258,7 @@ static void cb_convex_hull_slow()
 			}
 		}
 	}
-	plot_hull =true;
+	
 	
 	
 	hull_points.push_back(hull_vectors.begin()->first);
@@ -214,30 +276,112 @@ static void cb_convex_hull_slow()
 	duration = (double)(finish - start) / CLOCKS_PER_SEC;
 	cout << "Time: " << duration << "s" << endl;
 	
-	cout << "Hull length: " << hull_points.size() << endl;
-	for(vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
-	{
-		
-		cout << "(" << (*it)->x << "," << (*it)->y << ")";
-		if(it!=hull_points.end()-1)
-		{
-			cout << "->" << endl;
-		}
-	}
-	cout << endl;
+	Print_Hull();
+	
+	plot_hull =true;
 }
 
 
 
 static void cb_convex_hull_enhanced()
 {
+	L_upper.clear();
+	L_lower.clear();
+	hull_points.clear();
+	clock_t start, finish;
+    double duration;
+    
+    start = clock();
+    
+    map<double,Point*> Points_SortedInX;
+    for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+    {
+    	Points_SortedInX[it->x] = &(*it);
+    }
 	
+	
+	map<double,Point*>::iterator it_map_p = Points_SortedInX.begin();
+	L_upper.push_back(it_map_p->second); it_map_p++;
+	L_upper.push_back(it_map_p->second); it_map_p++;
+	
+	for ( ; it_map_p!=Points_SortedInX.end(); it_map_p++)
+	{
+		L_upper.push_back(it_map_p->second);
+		list<Point*>::iterator it_l = L_upper.end(); it_l--;
+		Point* P3 = *it_l; it_l--;
+		Point* P2 = *it_l; it_l--;
+		Point* P1 = *it_l;
+		while(L_upper.size()>2 && !(Right_Turn(P1,P2,P3)))
+		{
+			it_l = L_upper.end();
+			it_l--; it_l--;
+			L_upper.erase(it_l);
+			
+			if(L_upper.size()>2)
+			{
+				it_l = L_upper.end(); it_l--;
+				P3 = *it_l; it_l--;
+				P2 = *it_l; it_l--;
+				P1 = *it_l;
+			}
+		}
+	}
+	
+	
+	it_map_p = Points_SortedInX.end(); it_map_p--;
+	L_lower.push_back(it_map_p->second); it_map_p--;
+	L_lower.push_back(it_map_p->second); it_map_p--;
+	for ( ; it_map_p!=--Points_SortedInX.begin(); it_map_p--)
+	{
+		L_lower.push_back(it_map_p->second);
+		list<Point*>::iterator it_l = L_lower.end(); it_l--;
+		Point* P3 = *it_l; it_l--;
+		Point* P2 = *it_l; it_l--;
+		Point* P1 = *it_l;
+		while(L_lower.size()>2 && !(Right_Turn(P1,P2,P3)))
+		{
+			it_l = L_lower.end();
+			it_l--; it_l--;
+			L_upper.erase(it_l);
+			
+			if(L_lower.size()>2)
+			{
+				it_l = L_lower.end(); it_l--;
+				P3 = *it_l; it_l--;
+				P2 = *it_l; it_l--;
+				P1 = *it_l;
+			}
+		}
+	}
+	
+	L_lower.erase(L_lower.begin());
+	L_lower.erase(--L_lower.end());
+	
+	L_upper.splice(L_upper.end(),L_lower);
+	
+	for (list<Point*>::iterator it=L_upper.begin(); it!=L_upper.end(); it++)
+	{
+		hull_points.push_back(*it);
+	}
+	
+	finish = clock();
+	duration = (double)(finish - start) / CLOCKS_PER_SEC;
+	cout << "Time: " << duration << "s" << endl;
+	
+	Print_Hull();
+	
+	plot_hull =true;
 }
 
 
 
 static void cb_shuffle()
 {
+	hull_points.clear();
+	hull_vectors.clear();
+	L_upper.clear();
+	L_lower.clear();
+	
 	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		double Rand_C_r  = rand_gen(rand_gen(5));
@@ -249,6 +393,20 @@ static void cb_shuffle()
 		it->x = xx;
 		it->y = yy;
 	}
+	
+	x_min = Points.begin()->x;
+	x_max = Points.begin()->x; 
+	y_min = Points.begin()->y; 
+	y_max = Points.begin()->y;
+	
+	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+	{
+		if(x_min > it->x) x_min = it->x;
+		if(x_max < it->x) x_max = it->x;
+		if(y_min > it->y) y_min = it->y;
+		if(y_max < it->y) y_max = it->y;
+	}
+	
 }
 
 
@@ -269,6 +427,20 @@ int main()
 		double yy = Rand_C_r*sin(Rand_C_th) + r*sin(th);
 		Points.push_back(Point(xx,yy));
 	}
+	
+	x_min = Points.begin()->x;
+	x_max = Points.begin()->x; 
+	y_min = Points.begin()->y; 
+	y_max = Points.begin()->y;
+	
+	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+	{
+		if(x_min > it->x) x_min = it->x;
+		if(x_max < it->x) x_max = it->x;
+		if(y_min > it->y) y_min = it->y;
+		if(y_max < it->y) y_max = it->y;
+	}
+	
 	
 	
 		
