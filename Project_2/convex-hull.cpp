@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
 #include "gfx.hpp"
 #include <vector>
@@ -8,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define POINT_QTY 20
+#define POINT_QTY 10000
 #define pi M_PI
 
 
@@ -150,6 +151,43 @@ double rand_gen (double minval, double maxval)
 
 
 
+double get_time_usec()
+{
+	struct timeval tv;
+	struct timezone tz;
+	struct tm *tm;
+	gettimeofday(&tv, &tz);
+	tm=localtime(&tv.tv_sec);
+	
+	double h = (double)tm->tm_hour;
+	double m = (double)tm->tm_min;
+	double s = (double)tm->tm_sec;
+	double u = (double)tv.tv_usec;
+	
+	return (h*60*60*1000000+m*60*1000000+s*1000000+u);
+}
+
+void Show_running_time(double t1, double t2)
+{
+	if(t1>t2)
+	{
+		t2 += 24*60*60*1000000;
+	}
+	double duration = t2-t1;
+	if(duration >= 1000000)
+	{
+		int s  = (int)(duration / 1000000);
+		double us = duration-(double)s*1000000;
+		cout << "Time: " << s << " " << us << "us" << endl;
+	}
+	else
+	{
+		cout << "Time: " << duration << "us" << endl;
+	}
+	cout << "--------------------------------------------------" << endl;
+}
+
+
 void Print_Hull()
 {
 	cout << "Hull length: " << hull_points.size() << endl;
@@ -170,8 +208,6 @@ void Print_Hull()
 
 static void cb_draw()
 {
-	
-	
 	gfx::set_view(x_min-0.5, y_min-0.5, x_max+0.5, y_max+0.5);
 	
 	
@@ -183,10 +219,12 @@ static void cb_draw()
 	
 	if (plot_hull)
 	{
-		gfx::set_pen (1.0, 1.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
-		
 		for (vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
 		{
+			gfx::set_pen (1.0, 1.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
+			gfx::draw_arc ((*it)->x, (*it)->y, 0.5, 0, 2*pi);
+			
+			gfx::set_pen (1.0, 0.0, 0.0, 1.0, 1.0); // width, red, green, blue, alpha
 			if(it!=--hull_points.end())
 			{
 				vector<Point*>::iterator next = it + 1;
@@ -201,19 +239,6 @@ static void cb_draw()
 		
 		plot_hull = false;
 	}
-	
-	/*
-	gfx::set_pen (15.0, 1.0, 0.0, 0.0, 1.0);
-	for(list<Point*>::iterator it=L_upper.begin(); it!=L_upper.end(); it++)
-	{
-		gfx::draw_point((*it)->x, (*it)->y);
-	}
-	
-	gfx::set_pen (15.0, 0.0, 1.0, 0.0, 1.0);
-	for(list<Point*>::iterator it=L_lower.begin(); it!=L_lower.end(); it++)
-	{
-		gfx::draw_point((*it)->x, (*it)->y);
-	}*/
 }
 
 static void cb_mouse (double mx, double my, int flags)
@@ -221,15 +246,14 @@ static void cb_mouse (double mx, double my, int flags)
 	
 }
 
-static void cb_convex_hull_slow()
+static void cb_convex_hull_P3()
 {
 	hull_points.clear();
 	hull_vectors.clear();
 	
-	clock_t start, finish;
-    double duration;
+	double t_start, t_finish;
     
-    start = clock();
+    t_start = get_time_usec();
 	
 	//each vector starting from it1 and directing to it2
 	for (vector<Point>::iterator it1=Points.begin(); it1!=Points.end(); it1++)
@@ -272,26 +296,27 @@ static void cb_convex_hull_slow()
 		hull_points.push_back(Next);
 	}
 	
-	finish = clock();
-	duration = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "Time: " << duration << "s" << endl;
+	t_finish = get_time_usec();
 	
 	Print_Hull();
+	
+	cout << endl;
+	
+	Show_running_time(t_start, t_finish);
 	
 	plot_hull =true;
 }
 
 
 
-static void cb_convex_hull_enhanced()
+static void cb_convex_hull_P6()
 {
 	L_upper.clear();
 	L_lower.clear();
 	hull_points.clear();
-	clock_t start, finish;
-    double duration;
+	double t_start, t_finish;
     
-    start = clock();
+    t_start = get_time_usec();
     
     map<double,Point*> Points_SortedInX;
     for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
@@ -364,14 +389,90 @@ static void cb_convex_hull_enhanced()
 		hull_points.push_back(*it);
 	}
 	
-	finish = clock();
-	duration = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "Time: " << duration << "s" << endl;
+	t_finish = get_time_usec();
 	
 	Print_Hull();
 	
+	cout << endl;
+	
+	Show_running_time(t_start, t_finish);
+	
 	plot_hull =true;
 }
+
+
+
+
+
+
+
+
+
+
+static void cb_convex_hull_1_7()
+{
+	hull_points.clear();
+	double t_start, t_finish;
+    
+    t_start = get_time_usec();
+    
+    Point* P_rm = &(*Points.begin());
+    vector<Point>::iterator it_rm = Points.begin();
+    // find the rightmost point
+    for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+    {
+    	if(P_rm->x < it->x)
+    	{
+    		P_rm = &(*it);
+    		it_rm = it;
+    	}
+    }
+    hull_points.push_back(P_rm);
+    
+    double a_ref = -pi/2;
+    
+    Point* P = P_rm;
+    Point* P_next;
+    double da_m;
+    
+    while(1)
+    {
+    	da_m = -pi;
+		for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+		{
+			if(&(*it)!=P)
+			{
+				double a = atan2(it->y-P->y,it->x-P->x);
+				double da = Ang_Norm(a-a_ref);
+				if(da>da_m && da<=0)
+				{
+					P_next = &(*it);
+					da_m = da;
+				}
+			}
+		}
+		if(P_next == P_rm)  break;
+		hull_points.push_back(P_next);
+		a_ref = atan2(P_next->y-P->y,P_next->x-P->x);
+		P = P_next;
+    }
+	
+	t_finish = get_time_usec();
+	
+	Print_Hull();
+	
+	cout << endl;
+	
+	Show_running_time(t_start, t_finish);
+	
+	plot_hull =true;
+}
+
+
+
+
+
+
 
 
 
@@ -443,12 +544,13 @@ int main()
 	
 	
 	
-		
+	
 	// This just enables (rather verbose) debug messages from the gfx
 	// wrapper.  It is optional but can be rather useful.
 	//gfx::debug (&cout);
-	gfx::add_button("convex hull", cb_convex_hull_slow);
-	gfx::add_button("convex hull ++", cb_convex_hull_enhanced);
+	gfx::add_button("convex hull P3", cb_convex_hull_P3);
+	gfx::add_button("convex hull P6", cb_convex_hull_P6);
+	gfx::add_button("convex hull 1.7", cb_convex_hull_1_7);
 	gfx::add_button("shuffle", cb_shuffle);
 
 	gfx::main("convex hull slow", cb_draw, cb_mouse);

@@ -14,5 +14,5 @@ recurse: $(PRG).o gfx.o Makefile
 clean:
 	rm -rf *~ *.o *.dSYM $(PROGRAMS)
 
-gfx.o: gfx.cpp gfx.hpp Makefile
-convex-hull.o: convex-hull.cpp gfx.hpp Makefile
+#gfx.o: gfx.cpp gfx.hpp Makefile
+#convex-hull.o: convex-hull.cpp gfx.hpp Makefile
