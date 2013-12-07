@@ -1,6 +1,6 @@
 CXX = clang++
 CXXFLAGS = -Wall -O0 -g `pkg-config --cflags gtk+-2.0`
-PROGRAMS = convex-hull
+PROGRAMS = convex-hull convex-hull_P3_Step convex-hull_P6_Step convex-hull_1_7_Step
 
 all:
 	for prg in $(PROGRAMS); \
@@ -14,5 +14,3 @@ recurse: $(PRG).o gfx.o Makefile
 clean:
 	rm -rf *~ *.o *.dSYM $(PROGRAMS)
 
-#gfx.o: gfx.cpp gfx.hpp Makefile
-#convex-hull.o: convex-hull.cpp gfx.hpp Makefile

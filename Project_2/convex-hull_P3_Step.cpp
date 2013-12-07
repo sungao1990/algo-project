@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define POINT_QTY 10000
+#define POINT_QTY 10
 #define pi M_PI
 
 
@@ -19,11 +19,15 @@ class Point;
 vector<Point> Points;
 map<Point*,Point*> hull_vectors;   //key is the starting point, value is the ending point
 vector<Point*> hull_points;
-list<Point*> L_upper;
-list<Point*> L_lower;
+Point* P1_watching;
+Point* P2_watching;
+vector<Point>::iterator it1_watching;
+vector<Point>::iterator it2_watching;
 bool plot_hull(false);
+bool plot_step(false);
 double x_min, x_max, y_min, y_max;
-
+bool is_hull_vector(true);
+bool step_finish(false);
 
 
 double Ang_Norm(double a)
@@ -80,31 +84,6 @@ public:
 	double x;
 	double y;
 };
-
-
-
-
-
-
-
-
-
-
-bool Right_Turn(Point* P1, Point* P2, Point* P3)
-{
-	double a1,a2,da;
-	a1 = atan2(P2->y-P1->y, P2->x-P1->x);
-	a2 = atan2(P3->y-P2->y, P3->x-P2->x);
-	da = Ang_Norm(a2-a1);
-	if(da > 0)
-	{
-		return false;
-	}
-	else
-	{
-		return true;
-	}
-}
 
 
 
@@ -209,16 +188,62 @@ void Print_Hull()
 static void cb_draw()
 {
 	gfx::set_view(x_min-0.5, y_min-0.5, x_max+0.5, y_max+0.5);
-	
-	
 	gfx::set_pen (10.0, 0.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
 	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		gfx::draw_point(it->x, it->y);
 	}
 	
+	
+	
+	if(plot_step)
+	{
+		plot_step = false;
+		for (map<Point*,Point*>::iterator it=hull_vectors.begin(); it!=hull_vectors.end(); it++)
+		{
+			gfx::set_pen (1.0, 0.0, 1.0, 0.0, 1.0); // blue
+			gfx::draw_line (it->first->x, it->first->y, it->second->x, it->second->y);
+		}
+		if(!step_finish)
+		{
+			gfx::set_pen (1.0, 1.0, 0.0, 1.0, 1.0);
+			gfx::draw_arc (P1_watching->x, P1_watching->y, 0.5, 0, 2*pi);
+			gfx::set_pen (1.0, 0.0, 1.0, 1.0, 1.0);
+			gfx::draw_arc (P2_watching->x, P2_watching->y, 0.5, 0, 2*pi);
+			if(is_hull_vector)
+			{
+				gfx::set_pen (1.0, 0.0, 1.0, 0.0, 1.0); // green
+			}
+			else
+			{
+				gfx::set_pen (1.0, 1.0, 0.0, 0.0, 1.0); // red
+			}
+			double x1, y1, x2, y2;
+			if(P1_watching->x == P2_watching->x)
+			{
+				x1 = P1_watching->x;
+				x2 = P2_watching->x;
+				y1 = y_min-10;
+				y2 = y_max+10;
+			}
+			else
+			{
+				double k = (P2_watching->y-P1_watching->y)/(P2_watching->x-P1_watching->x);
+				x1 = x_min-10;
+				x2 = x_max+10;
+				y1 = P1_watching->y+k*(x1-P1_watching->x);
+				y2 = P1_watching->y+k*(x2-P1_watching->x);
+			}
+			gfx::draw_line (x1, y1, x2, y2);
+		}
+	}
+	
+	
+	
+	
 	if (plot_hull)
 	{
+		plot_hull = false;
 		for (vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
 		{
 			gfx::set_pen (1.0, 1.0, 0.0, 0.0, 1.0); // width, red, green, blue, alpha
@@ -236,8 +261,6 @@ static void cb_draw()
 				gfx::draw_line((*it)->x, (*it)->y, (*next)->x, (*next)->y);
 			}
 		}
-		
-		plot_hull = false;
 	}
 }
 
@@ -262,7 +285,7 @@ static void cb_convex_hull_P3()
 		{
 			if(it1 != it2)
 			{
-				bool is_hull_vector(true);
+				is_hull_vector = true;
 				//it3 is all the other points (excluding it1 and it2)
 				for (vector<Point>::iterator it3=Points.begin(); it3!=Points.end(); it3++)
 				{
@@ -309,166 +332,71 @@ static void cb_convex_hull_P3()
 
 
 
-static void cb_convex_hull_P6()
+
+
+static void cb_init()
 {
-	L_upper.clear();
-	L_lower.clear();
 	hull_points.clear();
-	double t_start, t_finish;
-    
-    t_start = get_time_usec();
-    
-    map<double,Point*> Points_SortedInX;
-    for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-    {
-    	Points_SortedInX[it->x] = &(*it);
-    }
-	
-	
-	map<double,Point*>::iterator it_map_p = Points_SortedInX.begin();
-	L_upper.push_back(it_map_p->second); it_map_p++;
-	L_upper.push_back(it_map_p->second); it_map_p++;
-	
-	for ( ; it_map_p!=Points_SortedInX.end(); it_map_p++)
-	{
-		L_upper.push_back(it_map_p->second);
-		list<Point*>::iterator it_l = L_upper.end(); it_l--;
-		Point* P3 = *it_l; it_l--;
-		Point* P2 = *it_l; it_l--;
-		Point* P1 = *it_l;
-		while(L_upper.size()>2 && !(Right_Turn(P1,P2,P3)))
-		{
-			it_l = L_upper.end();
-			it_l--; it_l--;
-			L_upper.erase(it_l);
-			
-			if(L_upper.size()>2)
-			{
-				it_l = L_upper.end(); it_l--;
-				P3 = *it_l; it_l--;
-				P2 = *it_l; it_l--;
-				P1 = *it_l;
-			}
-		}
-	}
-	
-	
-	it_map_p = Points_SortedInX.end(); it_map_p--;
-	L_lower.push_back(it_map_p->second); it_map_p--;
-	L_lower.push_back(it_map_p->second); it_map_p--;
-	for ( ; it_map_p!=--Points_SortedInX.begin(); it_map_p--)
-	{
-		L_lower.push_back(it_map_p->second);
-		list<Point*>::iterator it_l = L_lower.end(); it_l--;
-		Point* P3 = *it_l; it_l--;
-		Point* P2 = *it_l; it_l--;
-		Point* P1 = *it_l;
-		while(L_lower.size()>2 && !(Right_Turn(P1,P2,P3)))
-		{
-			it_l = L_lower.end();
-			it_l--; it_l--;
-			L_upper.erase(it_l);
-			
-			if(L_lower.size()>2)
-			{
-				it_l = L_lower.end(); it_l--;
-				P3 = *it_l; it_l--;
-				P2 = *it_l; it_l--;
-				P1 = *it_l;
-			}
-		}
-	}
-	
-	L_lower.erase(L_lower.begin());
-	L_lower.erase(--L_lower.end());
-	
-	L_upper.splice(L_upper.end(),L_lower);
-	
-	for (list<Point*>::iterator it=L_upper.begin(); it!=L_upper.end(); it++)
-	{
-		hull_points.push_back(*it);
-	}
-	
-	t_finish = get_time_usec();
-	
-	Print_Hull();
-	
-	cout << endl;
-	
-	Show_running_time(t_start, t_finish);
-	
-	plot_hull =true;
+	hull_vectors.clear();
+	it1_watching = Points.begin();
+	it2_watching = Points.begin();
+	step_finish = false;
+	cout << "initialization done!" << endl;
 }
 
 
 
 
 
-
-
-
-
-
-static void cb_convex_hull_1_7()
+static void cb_step()
 {
-	hull_points.clear();
-	double t_start, t_finish;
-    
-    t_start = get_time_usec();
-    
-    Point* P_rm = &(*Points.begin());
-    vector<Point>::iterator it_rm = Points.begin();
-    // find the rightmost point
-    for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-    {
-    	if(P_rm->x < it->x)
-    	{
-    		P_rm = &(*it);
-    		it_rm = it;
-    	}
-    }
-    hull_points.push_back(P_rm);
-    
-    double a_ref = -pi/2;
-    
-    Point* P = P_rm;
-    Point* P_next;
-    double da_m;
-    
-    while(1)
-    {
-    	da_m = -pi;
-		for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+	plot_step = true;
+	if(step_finish == false)
+	{
+		bool sth_is_done(false);
+		while(!sth_is_done)
 		{
-			if(&(*it)!=P)
+			P1_watching = &(*it1_watching);
+			P2_watching = &(*it2_watching);
+			if(it1_watching != it2_watching)
 			{
-				double a = atan2(it->y-P->y,it->x-P->x);
-				double da = Ang_Norm(a-a_ref);
-				if(da>da_m && da<=0)
+				sth_is_done = true;
+				is_hull_vector = true;
+				//it3 is all the other points (excluding it1 and it2)
+				for (vector<Point>::iterator it3=Points.begin(); it3!=Points.end(); it3++)
 				{
-					P_next = &(*it);
-					da_m = da;
+					if(it3!=it1_watching && it3!=it2_watching)
+					{
+						if (!it3->Left_Side_Of(it1_watching,it2_watching))
+						{
+							is_hull_vector = false;
+							break;
+						}
+					}
+				}
+				if (is_hull_vector)
+				{
+					hull_vectors[&(*it1_watching)] = &(*it2_watching);
+				}
+			}
+	
+			it2_watching++;
+			if(it2_watching==Points.end())
+			{
+				it2_watching = Points.begin();
+				it1_watching++;
+				if(it1_watching==Points.end())
+				{
+					step_finish = true;
 				}
 			}
 		}
-		if(P_next == P_rm)  break;
-		hull_points.push_back(P_next);
-		a_ref = atan2(P_next->y-P->y,P_next->x-P->x);
-		P = P_next;
-    }
-	
-	t_finish = get_time_usec();
-	
-	Print_Hull();
-	
-	cout << endl;
-	
-	Show_running_time(t_start, t_finish);
-	
-	plot_hull =true;
+	}
+	else
+	{
+		cout << "Finished!" << endl;
+	}
 }
-
-
 
 
 
@@ -480,9 +408,7 @@ static void cb_shuffle()
 {
 	hull_points.clear();
 	hull_vectors.clear();
-	L_upper.clear();
-	L_lower.clear();
-	
+		
 	for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
 	{
 		double Rand_C_r  = rand_gen(rand_gen(5));
@@ -507,7 +433,7 @@ static void cb_shuffle()
 		if(y_min > it->y) y_min = it->y;
 		if(y_max < it->y) y_max = it->y;
 	}
-	
+	cb_init();
 }
 
 
@@ -542,17 +468,16 @@ int main()
 		if(y_max < it->y) y_max = it->y;
 	}
 	
-	
+	cb_init();
 	
 	
 	// This just enables (rather verbose) debug messages from the gfx
 	// wrapper.  It is optional but can be rather useful.
 	//gfx::debug (&cout);
 	gfx::add_button("convex hull P3", cb_convex_hull_P3);
-	gfx::add_button("convex hull P6", cb_convex_hull_P6);
-	gfx::add_button("convex hull 1.7", cb_convex_hull_1_7);
 	gfx::add_button("shuffle", cb_shuffle);
-
+	gfx::add_button("reset",cb_init);
+	gfx::add_button("step",cb_step);
 	gfx::main("convex hull slow", cb_draw, cb_mouse);
 
 	return 0;

@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-#define POINT_QTY 10000
+#define POINT_QTY 10
 #define pi M_PI
 
 
@@ -17,11 +17,17 @@ using namespace std;
 class Point;
 
 vector<Point> Points;
-map<Point*,Point*> hull_vectors;   //key is the starting point, value is the ending point
 vector<Point*> hull_points;
 list<Point*> L_upper;
 list<Point*> L_lower;
+Point* P_Watching_1;
+Point* P_Watching_2;
+Point* P_Watching_3;
+bool highlight(false);
 bool plot_hull(false);
+bool step_finish(false);
+bool plot_step(false);
+bool reset(false);
 double x_min, x_max, y_min, y_max;
 
 
@@ -217,6 +223,60 @@ static void cb_draw()
 		gfx::draw_point(it->x, it->y);
 	}
 	
+	if (plot_step)
+	{
+		plot_step = false;
+		list<Point*>::iterator it_last = L_upper.end();
+		it_last--;
+		for(list<Point*>::iterator it=L_upper.begin(); it!=L_upper.end(); it++)
+		{
+			gfx::set_pen (1.0, 0.0, 0.0, 1.0, 1.0); // width, red, green, blue, alpha
+			gfx::draw_arc ((*it)->x, (*it)->y, 0.5, 0, 2*pi);
+			if(it != it_last)
+			{
+				list<Point*>::iterator it_next = it;
+				it_next++;
+				gfx::set_pen (1.0, 0.0, 0.0, 1.0, 1.0);
+				gfx::draw_line((*it)->x, (*it)->y, (*it_next)->x, (*it_next)->y);
+			}
+		}
+		
+		it_last = L_lower.end();
+		it_last--;
+		for(list<Point*>::iterator it=L_lower.begin(); it!=L_lower.end(); it++)
+		{
+			gfx::set_pen (1.0, 0.0, 0.0, 1.0, 1.0); // width, red, green, blue, alpha
+			gfx::draw_arc ((*it)->x, (*it)->y, 0.5, 0, 2*pi);
+			if(it != it_last)
+			{
+				list<Point*>::iterator it_next = it;
+				it_next++;
+				gfx::set_pen (1.0, 0.0, 0.0, 1.0, 1.0);
+				gfx::draw_line((*it)->x, (*it)->y, (*it_next)->x, (*it_next)->y);
+			}
+		}
+		
+		
+		if(highlight)
+		{
+			highlight = false;
+			gfx::set_pen (2.0, 1.0, 1.0, 0.0, 1.0);
+			gfx::draw_arc (P_Watching_1->x, P_Watching_1->y, 0.5, 0, 2*pi);
+			gfx::draw_arc (P_Watching_2->x, P_Watching_2->y, 0.5, 0, 2*pi);
+			gfx::draw_arc (P_Watching_3->x, P_Watching_3->y, 0.5, 0, 2*pi);
+			if(Right_Turn(P_Watching_1,P_Watching_2,P_Watching_3))
+			{
+				gfx::set_pen (2.0, 0.0, 1.0, 0.0, 1.0);
+			}
+			else
+			{
+				gfx::set_pen (2.0, 1.0, 0.0, 0.0, 1.0);
+			}
+			gfx::draw_line (P_Watching_1->x, P_Watching_1->y, P_Watching_2->x, P_Watching_2->y);
+			gfx::draw_line (P_Watching_2->x, P_Watching_2->y, P_Watching_3->x, P_Watching_3->y);
+		}
+	}
+	
 	if (plot_hull)
 	{
 		for (vector<Point*>::iterator it=hull_points.begin(); it!=hull_points.end(); it++)
@@ -246,66 +306,7 @@ static void cb_mouse (double mx, double my, int flags)
 	
 }
 
-static void cb_convex_hull_P3()
-{
-	hull_points.clear();
-	hull_vectors.clear();
-	
-	double t_start, t_finish;
-    
-    t_start = get_time_usec();
-	
-	//each vector starting from it1 and directing to it2
-	for (vector<Point>::iterator it1=Points.begin(); it1!=Points.end(); it1++)
-	{
-		for (vector<Point>::iterator it2=Points.begin(); it2!=Points.end(); it2++)
-		{
-			if(it1 != it2)
-			{
-				bool is_hull_vector(true);
-				//it3 is all the other points (excluding it1 and it2)
-				for (vector<Point>::iterator it3=Points.begin(); it3!=Points.end(); it3++)
-				{
-					if(it3!=it1 && it3!=it2)
-					{
-						if (!it3->Left_Side_Of(it1,it2))
-						{
-							is_hull_vector = false;
-							break;
-						}
-					}
-				}
-				if (is_hull_vector)
-				{
-					hull_vectors[&(*it1)] = &(*it2);
-				}
-			}
-		}
-	}
-	
-	
-	
-	hull_points.push_back(hull_vectors.begin()->first);
-	hull_points.push_back(hull_vectors.begin()->second);
-	
-	while(1)
-	{
-		Point* Next = hull_vectors[hull_points.back()];
-		if(Next == hull_points.front())
-			break;
-		hull_points.push_back(Next);
-	}
-	
-	t_finish = get_time_usec();
-	
-	Print_Hull();
-	
-	cout << endl;
-	
-	Show_running_time(t_start, t_finish);
-	
-	plot_hull =true;
-}
+
 
 
 
@@ -314,10 +315,10 @@ static void cb_convex_hull_P6()
 	L_upper.clear();
 	L_lower.clear();
 	hull_points.clear();
+	
 	double t_start, t_finish;
     
     t_start = get_time_usec();
-    
     map<double,Point*> Points_SortedInX;
     for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
     {
@@ -404,73 +405,175 @@ static void cb_convex_hull_P6()
 
 
 
-
-
-
-
-
-static void cb_convex_hull_1_7()
+static void cb_init()
 {
 	hull_points.clear();
-	double t_start, t_finish;
-    
-    t_start = get_time_usec();
-    
-    Point* P_rm = &(*Points.begin());
-    vector<Point>::iterator it_rm = Points.begin();
-    // find the rightmost point
-    for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-    {
-    	if(P_rm->x < it->x)
-    	{
-    		P_rm = &(*it);
-    		it_rm = it;
-    	}
-    }
-    hull_points.push_back(P_rm);
-    
-    double a_ref = -pi/2;
-    
-    Point* P = P_rm;
-    Point* P_next;
-    double da_m;
-    
-    while(1)
-    {
-    	da_m = -pi;
-		for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
-		{
-			if(&(*it)!=P)
-			{
-				double a = atan2(it->y-P->y,it->x-P->x);
-				double da = Ang_Norm(a-a_ref);
-				if(da>da_m && da<=0)
-				{
-					P_next = &(*it);
-					da_m = da;
-				}
-			}
-		}
-		if(P_next == P_rm)  break;
-		hull_points.push_back(P_next);
-		a_ref = atan2(P_next->y-P->y,P_next->x-P->x);
-		P = P_next;
-    }
-	
-	t_finish = get_time_usec();
-	
-	Print_Hull();
-	
-	cout << endl;
-	
-	Show_running_time(t_start, t_finish);
-	
-	plot_hull =true;
+	L_upper.clear();
+	L_lower.clear();
+	reset = true;
+	cout << "initialization done!" << endl;
 }
 
 
 
 
+static void cb_step()
+{
+	static char state = 0;  // 0:init    1:add new p to L_u/L_l    2:check or delete points according to the right-turn rule    3:finish
+	static Point* P1;
+	static Point* P2;
+	static Point* P3;
+	static list<Point*>::iterator it_l;
+	static map<double,Point*>::iterator it_map_p;
+	static map<double,Point*> Points_SortedInX;
+	
+	plot_step = true;
+	
+	if(reset)
+	{
+		reset = false;
+		state = 0;
+	}
+	
+	switch (state)
+	{
+		case 0:
+		{
+			Points_SortedInX.clear();
+			step_finish = false;
+	
+			for (vector<Point>::iterator it=Points.begin(); it!=Points.end(); it++)
+			{
+				Points_SortedInX[it->x] = &(*it);
+			}
+			it_map_p = Points_SortedInX.begin();
+			L_upper.push_back(it_map_p->second); it_map_p++;
+			L_upper.push_back(it_map_p->second); it_map_p++;
+			state = 1;
+			break;
+		}
+		case 1:
+		{
+			STATE_1:
+			L_upper.push_back(it_map_p->second);
+			it_l = L_upper.end(); it_l--;
+			P3 = *it_l; it_l--;
+			P2 = *it_l; it_l--;
+			P1 = *it_l;
+			highlight = true;
+			P_Watching_1 = P1;
+			P_Watching_2 = P2;
+			P_Watching_3 = P3;
+			state = 2;
+			break;
+		}
+		case 2:
+		{
+			if(L_upper.size()>2 && !(Right_Turn(P1,P2,P3)))
+			{
+				it_l = L_upper.end();
+				it_l--; it_l--;
+				L_upper.erase(it_l);
+		
+				if(L_upper.size()>2)
+				{
+					it_l = L_upper.end(); it_l--;
+					P3 = *it_l; it_l--;
+					P2 = *it_l; it_l--;
+					P1 = *it_l;
+					highlight = true;
+					P_Watching_1 = P1;
+					P_Watching_2 = P2;
+					P_Watching_3 = P3;
+				}
+			}
+			else
+			{
+				it_map_p++;
+				if(it_map_p == Points_SortedInX.end())
+				{
+					state = 3;
+					cout << "Upper list done!" << endl;
+				}
+				else
+				{
+					state = 1;
+					goto STATE_1;
+				}
+			}
+			break;
+		}
+		case 3:
+		{
+			it_map_p = Points_SortedInX.end(); it_map_p--;
+			L_lower.push_back(it_map_p->second); it_map_p--;
+			L_lower.push_back(it_map_p->second); it_map_p--;
+			state = 4;
+			break;
+		}
+		case 4:
+		{
+			STATE_4:
+			L_lower.push_back(it_map_p->second);
+			it_l = L_lower.end(); it_l--;
+			P3 = *it_l; it_l--;
+			P2 = *it_l; it_l--;
+			P1 = *it_l;
+			highlight = true;
+			P_Watching_1 = P1;
+			P_Watching_2 = P2;
+			P_Watching_3 = P3;
+			state = 5;
+			break;
+		}
+		case 5:
+		{
+			if(L_lower.size()>2 && !(Right_Turn(P1,P2,P3)))
+			{
+				it_l = L_lower.end();
+				it_l--; it_l--;
+				L_lower.erase(it_l);
+		
+				if(L_lower.size()>2)
+				{
+					it_l = L_lower.end(); it_l--;
+					P3 = *it_l; it_l--;
+					P2 = *it_l; it_l--;
+					P1 = *it_l;
+					highlight = true;
+					P_Watching_1 = P1;
+					P_Watching_2 = P2;
+					P_Watching_3 = P3;
+				}
+			}
+			else
+			{
+				it_map_p--;
+				if(it_map_p == --Points_SortedInX.begin())
+				{
+					state = 6;
+				}
+				else
+				{
+					state = 4;
+					goto STATE_4;
+				}
+			}
+			break;
+		}
+		case 6:
+		{
+			cout << "Lower list done" << endl;
+			state = 7;
+			break;
+		}
+		case 7:
+		{
+			cout << "All finished!" << endl;
+			break;
+		}
+	}
+}
 
 
 
@@ -479,7 +582,6 @@ static void cb_convex_hull_1_7()
 static void cb_shuffle()
 {
 	hull_points.clear();
-	hull_vectors.clear();
 	L_upper.clear();
 	L_lower.clear();
 	
@@ -507,7 +609,7 @@ static void cb_shuffle()
 		if(y_min > it->y) y_min = it->y;
 		if(y_max < it->y) y_max = it->y;
 	}
-	
+	cb_init();
 }
 
 
@@ -542,15 +644,14 @@ int main()
 		if(y_max < it->y) y_max = it->y;
 	}
 	
-	
-	
+	cb_init();
 	
 	// This just enables (rather verbose) debug messages from the gfx
 	// wrapper.  It is optional but can be rather useful.
 	//gfx::debug (&cout);
-	gfx::add_button("convex hull P3", cb_convex_hull_P3);
 	gfx::add_button("convex hull P6", cb_convex_hull_P6);
-	gfx::add_button("convex hull 1.7", cb_convex_hull_1_7);
+	gfx::add_button("reset",cb_init);
+	gfx::add_button("step",cb_step);
 	gfx::add_button("shuffle", cb_shuffle);
 
 	gfx::main("convex hull slow", cb_draw, cb_mouse);
