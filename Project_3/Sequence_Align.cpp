@@ -8,8 +8,8 @@
 #include <set>
 using namespace std;
 
-#define GAP_START -2
-#define GAP_EXTEND -8
+#define GAP_START (-2)
+#define GAP_EXTEND (-8)
 
 class table_element;
 
@@ -31,7 +31,7 @@ public:
 	
 	bool previous_is_up()
 	{
-		if (previous->row==row)
+		if (previous->column==column)
 			return true;
 		else
 			return false;
@@ -39,7 +39,7 @@ public:
 	
 	bool previous_is_left()
 	{
-		if (previous->column==column)
+		if (previous->row==row)
 			return true;
 		else
 			return false;
@@ -277,6 +277,7 @@ int main(int argc, char** argv)
 			for (int j=1; j<s1.length()+1; j++)
 			{
 				//cout << i-1 << "\t" << j-1 << endl;
+				
 				int gain1 = table[i-1][j-1].value + BLOSUM50[s2.at(i-1)][s1.at(j-1)];
 				
 				int gain2;
